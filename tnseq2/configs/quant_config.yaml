@@ -1,0 +1,16 @@
+
+dataDir: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/scratch/data
+metaDir: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/data/metadata
+outDir: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/scratch/04_07_map
+mappingDir: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/scratch/04_07_map/maps/
+sampleFile: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/scratch/samples.txt
+controlFile: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/data/metadata/controls.txt
+multiplex_codes: /nfs/nas22/fs2202/biol_micro_bioinf_nccr/hardt/nguyenb/tnseq/data/metadata/multiplex_codes.txt
+genome: /nfs/cds-peta/exports/biol_micro_cds_gr_sunagawa/scratch/ansintsova/test_data/tnseq/ref/Salmonella_genome_FQ312003.1_SL1344.fasta
+gff: /nfs/cds-peta/exports/biol_micro_cds_gr_sunagawa/scratch/ansintsova/test_data/tnseq/ref/Salmonella_genome+plasmids.gff
+fq_fwd: _1.fq.gz
+fq_rvr: _2.fq.gz
+fwd: _1.fq.gz
+rvr: _2.fq.gz
+
+tn: GTGTATAAGAGACAG:17:13:before

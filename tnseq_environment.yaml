@@ -1,0 +1,10 @@
+name: tnseq2
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - python==3.8.*
+  - snakemake==5.22.*
+  - blast==2.9.*
+  - bedtools==2.30.*
