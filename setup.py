@@ -2,7 +2,8 @@ from setuptools import setup
 
 requires = [
     'click',
-    'biopython>=1.7'
+    'biopython>=1.7',
+    'pandas'
     ]
 
 setup(

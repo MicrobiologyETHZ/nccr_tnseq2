@@ -7,6 +7,8 @@ import collections
 import sys
 import pandas as pd
 from pathlib import Path
+from logging import Logger
+from tnseq2.src.tnseq_logger import get_logger
 
 
 def shutdown(status=0):
@@ -19,7 +21,7 @@ def shutdown(status=0):
 
 def extract_barcodes(inserts: Generator[Tuple[FastA, FastA], None, None],
                     tp2: str='GTGTATAAGAGACAG', bc2tp2:int=13, bcLen:int=17, before:bool=True,
-                      min_host_bases: int = 20) -> List[Tuple[str, str]]:
+                      min_host_bases: int = 20, logger: Logger = logging.getLogger()) -> List[Tuple[str, str]]:
     '''
     -----|BARCODE|----------|TN end sequence (tp2)|---Host------
     -----|-bcLen-|--bc2tp2--|---------tp2---------|-------------
@@ -59,21 +61,21 @@ def extract_barcodes(inserts: Generator[Tuple[FastA, FastA], None, None],
                 inserts_with_tp2_but_short_bc += 1
         else:
             inserts_without_tp2 += 1
-    logging.info(f'Processed {total_inserts} reads')
-    logging.info('Extraction statistics:')
-    logging.info(f'\tTotal inserts:\t{total_inserts}\t100.0%')
-    logging.info(f'\tInserts w transposon:\t{inserts_with_tp2}\t{int(100 * ((inserts_with_tp2 * 100.0)/total_inserts))/100.0}%')
-    logging.info(f'\t\tand w barcode:\t{inserts_with_tp2_with_good_bc}\t{int(100 * ((inserts_with_tp2_with_good_bc * 100.0)/total_inserts))/100.0}%')
-    logging.info(f'\t\t\tand good host sequence:\t{len(sequences)}\t{int(100 * ((len(sequences) * 100.0)/total_inserts))/100.0}% --> Used for downstream analysis')
-    logging.info(f'\t\t\tand short host sequence:\t{inserts_with_tp2_with_good_bc_short_host}\t{int(100 * ((inserts_with_tp2_with_good_bc_short_host * 100.0)/total_inserts))/100.0}%')
-    logging.info(f'\t\tand w/o barcode:\t{inserts_with_tp2_but_short_bc}\t{int(100 * ((inserts_with_tp2_but_short_bc * 100.0)/total_inserts))/100.0}%')
-    logging.info(f'\tInserts w/o transposon:\t{inserts_without_tp2}\t{int(100 * ((inserts_without_tp2 * 100.0)/total_inserts))/100.0}%')
+    logger.info(f'Processed {total_inserts} reads')
+    logger.info('Extraction statistics:')
+    logger.info(f'\tTotal inserts:\t{total_inserts}\t100.0%')
+    logger.info(f'\tInserts w transposon:\t{inserts_with_tp2}\t{int(100 * ((inserts_with_tp2 * 100.0)/total_inserts))/100.0}%')
+    logger.info(f'\t\tand w barcode:\t{inserts_with_tp2_with_good_bc}\t{int(100 * ((inserts_with_tp2_with_good_bc * 100.0)/total_inserts))/100.0}%')
+    logger.info(f'\t\t\tand good host sequence:\t{len(sequences)}\t{int(100 * ((len(sequences) * 100.0)/total_inserts))/100.0}% --> Used for downstream analysis')
+    logger.info(f'\t\t\tand short host sequence:\t{inserts_with_tp2_with_good_bc_short_host}\t{int(100 * ((inserts_with_tp2_with_good_bc_short_host * 100.0)/total_inserts))/100.0}%')
+    logger.info(f'\t\tand w/o barcode:\t{inserts_with_tp2_but_short_bc}\t{int(100 * ((inserts_with_tp2_but_short_bc * 100.0)/total_inserts))/100.0}%')
+    logger.info(f'\tInserts w/o transposon:\t{inserts_without_tp2}\t{int(100 * ((inserts_without_tp2 * 100.0)/total_inserts))/100.0}%')
     return sequences
 
 
 def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: str,
                              tp2: str='GTGTATAAGAGACAG', bc2tp2:int=13, bcLen:int=17, before:bool=True,
-                             min_host_bases: int = 20) -> None:
+                             min_host_bases: int = 20, logger: Logger = logging.getLogger()) -> None:
     '''
     Wrapper function to extract barcodes and host sequences from
     sequence file. Sequences will then be written to fasta file
@@ -85,13 +87,13 @@ def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: 
     '''
     fq1_stream: Generator[FastA, None, None] = stream_fa(in_r1_file)
     fq2_stream: Generator[FastA, None, None] = stream_fa(in_r2_file)
-    logging.info('----------------')
-    logging.info('Step 1.1: Start extraction')
+    logger.info('----------------')
+    logger.info('Step 1.1: Start extraction')
     inserts: Iterator[Tuple[FastA, FastA]] = zip(fq1_stream, fq2_stream)
-    alignments = extract_barcodes(inserts, tp2, bc2tp2, bcLen, before, min_host_bases)
-    logging.info('Step 1.1: Finished extraction')
-    logging.info('----------------')
-    logging.info('Step 1.2: Start writing dereplicated barcode/host pairs.')
+    alignments = extract_barcodes(inserts, tp2, bc2tp2, bcLen, before, min_host_bases, logger)
+    logger.info('Step 1.1: Finished extraction')
+    logger.info('----------------')
+    logger.info('Step 1.2: Start writing dereplicated barcode/host pairs.')
     with open(temp_fasta_file, 'w') as handle:
         barcode_2_sequences = collections.defaultdict(list)
         for alignment in alignments:
@@ -101,12 +103,12 @@ def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: 
             for sequence, cnt in collections.Counter(sequences).most_common():
                 handle.write(f'>{tot}_bc_{barcode}_cnt_{cnt}\n{sequence}\n')
                 tot += 1
-    logging.info(f'Step 1.2: Finished writing {tot-1} dereplicated barcode/host pairs.')
-    logging.info('----------------')
+    logger.info(f'Step 1.2: Finished writing {tot-1} dereplicated barcode/host pairs.')
+    logger.info('----------------')
 
 
 def map_host_map(temp_fasta_file: str, temp_blastn_file: str, genome: str = '',
-                 blastdb: str = '', blast_threads: int = 1) -> None:
+                 blastdb: str = '', blast_threads: int = 1, logger: Logger = logging.getLogger()) -> None:
     """
     Map reads against the  blast database (create database if doesn't already exist)
     :param temp_fasta_file:
@@ -130,11 +132,11 @@ def map_host_map(temp_fasta_file: str, temp_blastn_file: str, genome: str = '',
     command = f'blastn -task blastn -db {blastdb} -out {temp_blastn_file} -query {temp_fasta_file} ' \
               f'-outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore qseq sstrand" ' \
               f'-num_threads {blast_threads}'
-    logging.info(f'Blastn command:\t{command}')
+    logger.info(f'Blastn command:\t{command}')
     check_call(command)
 
 
-def new_map_annotate(blast_file: str) -> pd.DataFrame:
+def new_map_annotate(blast_file: str, logger: Logger = logging.getLogger()) -> pd.DataFrame:
     """
     Takes in blast file, and provides most likely locations for each barcode
 
@@ -155,6 +157,7 @@ def new_map_annotate(blast_file: str) -> pd.DataFrame:
     total_count.columns = ['barcode', 'total_count']
     best_hits = best_hits.merge(total_count, how='left', on='barcode')
     best_hits = best_hits[best_hits.cnt > 10]
+    logger.info(f"Number of barcodes: {best_hits.barcode.nunique()}")
     # Create best hits data frame by merging best_hits with other columns from blast file
     # There still could be multiple hits for each qseqid, if they have the same blast score
     queryBH = best_hits.merge(df, how='left', on=['qseqid', 'bitscore'])
@@ -189,7 +192,7 @@ def editdistance(seq1: str, seq2: str) -> int:
     return dist
 
 
-def merge_colliding_bcs(potential_positions: pd.DataFrame, edit_dist=3) -> pd.DataFrame:
+def merge_colliding_bcs(potential_positions: pd.DataFrame, edit_dist=3, logger: Logger = logging.getLogger()) -> pd.DataFrame:
     '''
 
     Takes output of new_map_annotate, and merges colliding barcodes
@@ -204,6 +207,7 @@ def merge_colliding_bcs(potential_positions: pd.DataFrame, edit_dist=3) -> pd.Da
     # Collisions are only positions with more than one bc mapped
     collisions = collisions[collisions.num_uniq_bc > 1]
     collisions = collisions.merge(pps, on=['sseqid', 'sstart'])
+    logger.info(f'Number of collissions: {collisions.shape[0]}')
     for position, df in collisions.groupby(['sseqid', 'sstart']):  # todo refactor
         # Get the barcode that was seen the most
         bc_idx = df.total_count.astype(int).idxmax()
@@ -252,30 +256,35 @@ def add_gene_annotations(bedfile_path, barcode_map, barcode_file):
 
 def map_host_new(temp_fasta_file: str, temp_blastn_file: str, genome: str,
                  blast_threads: int, temp_bed_file: str, output_map: str, barcode_file: str, gff_file: str='',
-                 ) -> None:
+                 logger: Logger = logging.getLogger()) -> None:
 
-    logging.info('----------------')
-    logging.info('Step 2.1: Start blastn alignment of dereplicated barcode/host pairs')
+    logger.info('----------------')
+    logger.info('Step 2.1: Start blastn alignment of dereplicated barcode/host pairs')
     # Runs blast
-    map_host_map(temp_fasta_file, temp_blastn_file, genome=genome, blast_threads=blast_threads)
-    logging.info('Step 2.1: Finished blastn alignment of dereplicated barcode/host pairs')
-    logging.info('----------------')
-    logging.info('Step 2.2: Start annotating barcodes')
+    map_host_map(temp_fasta_file, temp_blastn_file, genome=genome, blast_threads=blast_threads, logger=logger)
+    logger.info('Step 2.1: Finished blastn alignment of dereplicated barcode/host pairs')
+    logger.info('----------------')
+    logger.info('Step 2.2: Start annotating barcodes')
     # Figure out the positions
-    potential_positions = new_map_annotate(temp_blastn_file)
-    final_positions = merge_colliding_bcs(potential_positions)
+    potential_positions = new_map_annotate(temp_blastn_file, logger)
+    logger.info('Resolving barcode collisions')
+    final_positions = merge_colliding_bcs(potential_positions, logger=logger)
     final_positions.to_csv(barcode_file)
-    print(gff_file)
-    # create bed file
+    logger.info(f'GFF file provided: {gff_file}')
     if gff_file:
+        logger.info('Adding gene annotations from the gff file')
         add_gff_annotations(final_positions, temp_bed_file,  gff_file,  output_map)
         add_gene_annotations(output_map, final_positions, barcode_file)
-
+    logger.info('Finished Annotating Barcodes')
     return None
 
 
 def map(r1_file, r2_file, name, output_dir, transposon, genome, gff_file,  min_host_bases=20, blast_threads=1):
-
+    logger = get_logger('Quantify_Logger', Path(output_dir) / 'tnseq2_mapping.log')
+    logger.info(f'Transposon: {transposon}')
+    logger.info(f"FASTQ file: {r1_file}")
+    logger.info(f"GFF file: {gff_file}")
+    logger.info(f"Reference Genome: {genome}")
     fasta_file = Path(output_dir)/f'{name}.fasta'
     blastn_file = Path(output_dir)/f'{name}.blastn'
     tp2 = transposon.split(':')[0]
@@ -285,8 +294,10 @@ def map(r1_file, r2_file, name, output_dir, transposon, genome, gff_file,  min_h
     barcode_file = Path(output_dir)/f'{name}.barcode_map.csv'
     bed_file = Path(output_dir)/f'{name}.temp.bed'
     output_map = Path(output_dir)/f'{name}.output.bed'
-    prepare_extract_barcodes(r1_file,  r2_file, fasta_file,  tp2, bc2tp2, bcLen, before, min_host_bases)
-    map_host_new(fasta_file, blastn_file, genome, blast_threads, bed_file, output_map,  barcode_file, gff_file)
+    logger.info("Starting Barcode Mapping")
+    logger.info('Extracting Barcodes')
+    prepare_extract_barcodes(r1_file,  r2_file, fasta_file,  tp2, bc2tp2, bcLen, before, min_host_bases, logger)
+    map_host_new(fasta_file, blastn_file, genome, blast_threads, bed_file, output_map,  barcode_file, gff_file, logger)
 
 
 if __name__ == '__main__':

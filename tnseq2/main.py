@@ -43,36 +43,42 @@ def demux(config, input_file, demux_file, out_dir, rc, transposon, dry, local, n
 
 # MAPPING
 @main.command()
-@click.option('--config', '-c', help='Configuration File')
 @click.option('--forward', '-f',  help='Forward Reads')
 @click.option('--reverse', '-r',  help='Reverse Reads')
-@click.option('--gff', '-a', default='', help='Annotation File')
-@click.option('--genome', '-g',  help='Reference Genome')
+@click.option('--gff', '-a', default='', help='Annotation File in gff format. '
+                                              'The tool will extract Name and locus_tag from gene features')
+@click.option('--genome', '-g',  help='Reference genome (FASTA)')
 @click.option('--name', '-n', help='Unique library name')
 @click.option('--out_dir', '-o', default='.', help='Output directory')
 @click.option('--blast_threads', '-t', default=1, help='Blast Threads')
 @click.option('--transposon', '-tn', default="GTGTATAAGAGACAG:17:13:before", help='Construct Structure:\n\n'
                                                                                 'TN sequence:BC length:length of spacer between BC and TN sequence:BC position relative to TN \n\n'
                                                                                   'Default: GTGTATAAGAGACAG:17:13:before')
-@click.option('--dry',  is_flag=True, help="Show commands without running them")
-@click.option('--local',  is_flag=True, help="Run on local machine")
-def maplib(config, forward, reverse, gff, name, transposon, out_dir, genome,blast_threads, local, dry):
-    if (config or forward) and not (config and forward):
-        if config:
-            print(f'Your provided a config file: {config}')
-            click.echo("Mapping Barcode Libraries")
-            click.echo(f"Config file: {config}")
-            #click.echo("Samples found: ")
-            click.echo("Running {}".format('locally' if local else ('dry' if dry else 'on cluster')))
-            cmd = snakemake_cmd(config, 'map', dry, local)
-            click.echo(" ".join(cmd))
-        else:
-            logging.info(f"You've provided a FASTQ file: {forward}")
-            click.echo(gff)
-            map(forward, reverse, name, out_dir, transposon, genome, gff_file=gff, blast_threads=blast_threads)
-    else:
-        print('Provide either config or FASTQ file, not both')
-        sys.exit(1)
+def maplib(forward, reverse, gff, name, transposon, out_dir, genome, blast_threads):
+    if not name:
+        name = Path(forward.strip('.gz')).stem
+    map(forward, reverse, name, out_dir, transposon, genome, gff_file=gff, blast_threads=blast_threads)
+
+
+# COUNT
+@main.command(help="Counting Barcodes in Samples")
+@click.option('--forward', '-f',  help='Input FASTQ to count. (Forward Reads only)')
+@click.option('--mapping_file', '-m', help='Barcode Map in csv format. First column must be titled "barcode", and contain the barcodes. \n\n'
+                                           'Example: \n\n'
+                                           'barcode,barcodeID\n\n'
+                                           'AGACCAGTACATGACGGGTATCTCTCTGCCACTCCTGTAT,Tag_1\n\n')
+
+@click.option('--out_dir', '-o', default='.', help='Output Directory')
+@click.option('--sample_name', '-n', default='', help='Sample Name')
+@click.option('--transposon', '-tn', default="GTGTATAAGAGACAG:17:13:before", help='Construct Structure:\n\n'
+                                                                                'TN sequence:BC length:length of spacer between BC and TN sequence:BC position relative to TN (before or after) \n\n'
+                                                                                  '-|BARCODE|-spacer-|--TN sequence--|-\n\n'
+                                                                                  '-|-17bp--|--13bp--|GTGTATAAGAGACAG|-\n\n'
+                                                                                  'Default: GTGTATAAGAGACAG:17:13:before')
+def count(forward, mapping_file, out_dir, transposon, sample_name):
+    if not sample_name:
+        sample_name = Path(forward.strip('.gz')).stem
+    quantify(forward, transposon, mapping_file, out_dir, sample_name)
 
 
 
@@ -91,30 +97,7 @@ def custom(config, local, dry, method):
     click.echo(" ".join(cmd))
 
 
-# COUNT
-@main.command(help="Counting Barcodes in Samples")
-@click.option('--config', '-c', help='Configuration File')
-@click.option('--input_file', '-i',  help='Input FASTQ to count')
-@click.option('--mapping_file', '-m', help='Barcode Map, format:')
-@click.option('--out_dir', '-o', default='.', help='Output Directory')
-@click.option('--sample_name', '-n', default='', help='Sample Name')
-@click.option('--local',  is_flag=True, help="Run on local machine")
-@click.option('--dry',  is_flag=True, help="Show commands without running them")
-def count(config, input_file, mapping_file, out_dir, sample_name, local, dry):
-    if (config or input_file) and not (config and input_file):
-        if config:
-            logging.info(f'Your provided a config file: {config}')
-            click.echo("Running {}".format('locally' if local else ('dry' if dry else 'on cluster')))
-            cmd = snakemake_cmd(config, 'quantify', dry, local)
-            click.echo(" ".join(cmd))
-        else:
-            logging.info(f"You've provided a FASTQ file: {input_file}")
-            if not sample_name:
-                sample_name = Path(input_file.strip('.gz')).stem
-            quantify(input_file, mapping_file, out_dir, sample_name)
-    else:
-        print('Provide either config or FASTQ file (but not both)')
-        sys.exit(1)
+
 
 #MERGE
 @main.command()
