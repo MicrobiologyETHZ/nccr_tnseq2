@@ -18,18 +18,29 @@ sdf_file <-args[1]
 
 edf_file <- args[2]
 
+design <- args[3]
 
 experiment <- unlist(strsplit(basename(sdf_file), '_sdf'))[[1]]
 prefix <- unlist(strsplit(sdf_file, '_sdf'))[[1]]
 sdf <- read.csv(sdf_file, row.names=1)
 edf <- read.csv(edf_file, row.names=1)
 calculate_fitness <- function(sdf, edf, prefix){
-    dds <- DESeq2::DESeqDataSetFromMatrix(countData=edf, colData=sdf, design=~day)
+
+    if(design == 'day'){
+        print('Design: day')
+        dds <- DESeq2::DESeqDataSetFromMatrix(countData=edf, colData=sdf, design=~day)
+    }
+    else{
+        print('Design: experiment + day')
+        dds <- DESeq2::DESeqDataSetFromMatrix(countData=edf, colData=sdf, design=~experiment + day)
+    }
+    #dds <- DESeq2::DESeqDataSetFromMatrix(countData=edf, colData=sdf, design=~experiment + day)
+    #dds <- DESeq2::DESeqDataSetFromMatrix(countData=edf, colData=sdf, design=~day)
     dds <- DESeq2::DESeq(dds)
     fitness <- list()
     for(day in levels(dds$day)[-1]){
-        fitness[[day]] <- as.data.frame(DESeq2::lfcShrink(dds, coef=paste0("day_", day, "_vs_d0"), type="apeglm"))
-        #fitness[[day]] <- as.data.frame(DESeq2::results(dds, name=paste0("day_", day, "_vs_d0")))
+        #fitness[[day]] <- as.data.frame(DESeq2::lfcShrink(dds, coef=paste0("day_", day, "_vs_d0"), type="apeglm"))
+        fitness[[day]] <- as.data.frame(DESeq2::results(dds, name=paste0("day_", day, "_vs_d0")))
     }
 
     lapply(levels(dds$day)[-1], function(x) write.table(fitness[[x]], paste(prefix, '_fitness_', x, ".txt", sep="")))

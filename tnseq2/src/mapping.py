@@ -156,7 +156,7 @@ def new_map_annotate(blast_file: str, logger: Logger = logging.getLogger()) -> p
     total_count = best_hits.groupby('barcode').cnt.sum().reset_index()
     total_count.columns = ['barcode', 'total_count']
     best_hits = best_hits.merge(total_count, how='left', on='barcode')
-    best_hits = best_hits[best_hits.cnt > 10]
+    best_hits = best_hits[best_hits.cnt > 100]
     logger.info(f"Number of barcodes: {best_hits.barcode.nunique()}")
     # Create best hits data frame by merging best_hits with other columns from blast file
     # There still could be multiple hits for each qseqid, if they have the same blast score

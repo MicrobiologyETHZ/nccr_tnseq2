@@ -58,34 +58,40 @@ def calculate_correlation(exp_df, control_file, for_each='sampleID', how='log', 
     corr_df = corr_df[corr_df['level_2'] == col1].drop(['level_2', col1], axis=1)
     corr_df.columns = ['phenotype', 'sampleID', 'R']
 
-    good_samples = corr_df[(corr_df.R > cutoff) & (corr_df.phenotype == 'wt')].sampleID.values
+    good_samples = corr_df[(corr_df.R**2 > cutoff) & (corr_df.phenotype == 'wt')].sampleID.values
     return corr_df, good_samples
 
 
 ## Filter Data
 
-def filter_inoculum(exp_df, filter_below=0):
+def filter_inoculum(exp_df, filter_below=0, sample_id='sampleID'):
     filt_df = (exp_df.copy()
                .drop(['ShortName', 'locus_tag'], axis=1)
                .drop_duplicates()
-               .pivot(index='barcode', columns='sampleID', values='cnt'))
+               .pivot(index='barcode', columns=sample_id, values='cnt'))
+
     filt_df = filt_df.fillna(0)
     columns_to_filter = [f for f in filt_df.columns if 'inoculum' in f]
+
     filt_df = filt_df[(filt_df[columns_to_filter] >= filter_below).all(1)]
-    #filt_df = filt_df[(filt_df['inoculum_d0'] >=filter_below)& (filt_df['unenriched_inoculum_d0'] >= filter_below)]
     return filt_df
 
 
-def filter_samples(exp_df, good_samples):
-    return exp_df.copy()[exp_df.sampleID.isin(good_samples)]
+def filter_samples(exp_df, good_samples, sample_id='sampleID'):
+    return exp_df.copy()[exp_df[sample_id].isin(good_samples)]
 
 
-def generate_DE_dataset(exp_df, good_samples, filter_below=0):
-    sample_data = exp_df[['sampleID', 'mouse', 'day', 'tissue', 'dnaid']].set_index('sampleID').drop_duplicates()
+def generate_DE_dataset(exp_df, good_samples, sample_id='sampleID', filter_below=0):
+
+    sample_data = exp_df[[sample_id, 'mouse', 'day', 'tissue', 'dnaid', 'experiment']].set_index(sample_id).drop_duplicates()
     sample_data = sample_data.loc[sample_data.index.intersection(good_samples)]
-    expr_data = filter_samples(exp_df, good_samples)
-    expr_data = filter_inoculum(expr_data, filter_below=filter_below)
+
+    expr_data = filter_samples(exp_df, good_samples, sample_id)
+
+    expr_data = filter_inoculum(expr_data, filter_below=filter_below, sample_id=sample_id)
+
     expr_data = expr_data[list(sample_data.index)].reset_index()
+
     return sample_data, expr_data
 
 
@@ -98,13 +104,13 @@ def run_command(args):
         raise e
 
 
-def get_fintess_results(fitness_dir, dnaid, experiment, sdf, edf):
+def get_fintess_results(fitness_dir, dnaid, experiment, sdf, edf, design):
     sdf_path = Path(fitness_dir) / f"{dnaid}_{experiment}_sdf.csv"
     edf_path = Path(fitness_dir) / f"{dnaid}_{experiment}_edf.csv"
     sdf.to_csv(sdf_path)
     edf.set_index('barcode').to_csv(edf_path)
     rpath = Path(__file__).parent.absolute()
-    r = run_command(['Rscript', rpath/'DEseq.R', sdf_path, edf_path])
+    r = run_command(['Rscript', rpath/'DEseq.R', sdf_path, edf_path, design])
     fitness = pd.concat(
         [pd.read_table(f, sep=' ').assign(day=f.stem.split("_")[3]) for f in Path(fitness_dir).iterdir() if
          f"{dnaid}_{experiment}_fitness" in f.stem])
@@ -308,3 +314,38 @@ def analyze_dnaid(counts_dir, dnaid, control_file, cutoff, to_filter, outdir):
     final.to_csv(Path(outdir) / f'{dnaid}_final_results.csv')
     return final
 
+
+def analyze_library(fdf, sample_id, good_samples, dnaid, experiment, control_file, to_filter, outdir, design):
+    """
+     param fdf: already subset datframe
+     good_samples: samples passing the correlation cutoff
+
+     If not enough samples, stop the analysis
+
+    # Could add paired option to DESeq2 as now combining results from multiple experiments.
+
+    """
+
+    n_samples = collections.Counter([si.split("_")[1] for si in good_samples])
+    d0 = n_samples.pop('d0', 0)
+    print(n_samples)
+    # Check that for at least one condition have replicates, if not quite
+    if (not d0 >= 1) or (not any([i > 1 for i in n_samples.values()])):
+        print('oi')
+        return pd.DataFrame()
+    else:
+        # Filter
+        print("Filtering Dataset")
+        sdf, edf = generate_DE_dataset(fdf, good_samples, filter_below=to_filter, sample_id=sample_id)
+        # Run DESeq2
+        print("Running DESeq2")
+        fitness = get_fintess_results(outdir, dnaid, experiment, sdf, edf, design)
+
+        # Calculate z-scores
+        print('Calculating z-scores')
+        results = calculte_comparisons(fitness, fdf, control_file)
+
+        # Summarize results
+        print('Summarizing')
+        final = final_fitness_table(fitness, fdf, control_file, results)
+        return fitness, final

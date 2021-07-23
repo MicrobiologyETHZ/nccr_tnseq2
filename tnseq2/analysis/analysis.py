@@ -261,7 +261,7 @@ def process_results(exp_df, controls, good_samples, filter_below=1000, cntrl_typ
 
 def run_dnaid(sample_df, controls, dnaid, filter_below=1000, cntrl_type='wt', cutoff=0.9 ):
     fresults = []
-    experiments = list(sample_df[sample_df.dnaid==dnaid].experiment.unique())
+    experiments = list(sample_df[sample_df.dnaid == dnaid].experiment.unique())
     for exp in experiments:
         exp_df = subset_experiment(sample_df, dnaid, exp)
         wits, good_samples = calculate_correlation(exp_df, controls, cutoff=cutoff)
