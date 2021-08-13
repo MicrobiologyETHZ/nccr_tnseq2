@@ -22,15 +22,15 @@ def shutdown(status=0):
 def extract_barcodes(inserts: Generator[Tuple[FastA, FastA], None, None],
                     tp2: str='GTGTATAAGAGACAG', bc2tp2:int=13, bcLen:int=17, before:bool=True,
                       min_host_bases: int = 20, logger: Logger = logging.getLogger()) -> List[Tuple[str, str]]:
-    '''
+    """
     -----|BARCODE|----------|TN end sequence (tp2)|---Host------
     -----|-bcLen-|--bc2tp2--|---------tp2---------|-------------
     -----|-17bp--|---13bp---|---------15bp--------|----?--------
     ---(-30)---(-13)-------(0)---------------------------------
     :param inserts genreator over r1 and r2 sequence.FastA
 
+    """
 
-    '''
     if not tp2:
         logging.error('Unkown transposon')
         shutdown(1)

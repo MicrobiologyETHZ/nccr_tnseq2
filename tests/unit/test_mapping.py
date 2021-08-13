@@ -1,23 +1,42 @@
-#from tnseq import sequence
-#from tnseq import tnseq
-#from tnseq import extract_barcodes
-
 from tnseq2.src.mapping import *
+from tnseq2.src.sequence import stream_fa
 import subprocess
 import shlex
 
-TESTDATA = "/nfs/cds-peta/exports/biol_micro_cds_gr_sunagawa/scratch/ansintsova/test_data/tnseq/"
+TESTDATA = "/Users/ansintsova/git_repos/tnseq2.0/tests/test_files"
 
 
-def get_test_data():
-    r1 = f'{TESTDATA}/mapping/library_13_1_1.fq'
-    r2 = f'{TESTDATA}/mapping/library_13_1_2.fq'
-    genome = f'{TESTDATA}/ref/Salmonella_genome_FQ312003.1_SL1344.fasta'
-    expectedMap = f'{TESTDATA}/mapping/library_13_1_barcode_ed.txt'
-    outMap = f'{TESTDATA}/mapping/tmp/library_13_1_barcode.txt'
-    return r1, r2, genome, expectedMap, outMap
 
-def get_test_data_map():
+
+
+def get_test_inserts():
+    r1 = f'{TESTDATA}/library_13_1_1.fq'
+    r2 = f'{TESTDATA}/library_13_1_2.fq'
+    inserts = zip(stream_fa(r1), stream_fa(r2))
+    return inserts
+
+
+def parse_transposon(transposon="GTGTATAAGAGACAG:17:13:before"):
+    tp2, bc2tp2, bcLen, before = transposon.split(":")
+    return tp2, bc2tp2, bcLen, before
+
+
+def test_extract_barcodes():
+    """Check ...."""
+    inserts = get_test_inserts()
+    tp2, bc2tp2, bcLen, before = parse_transposon()
+    barcodes = extract_barcodes(inserts, tp2, bc2tp2, bcLen, before)
+
+
+
+
+
+#     genome = f'{TESTDATA}/ref/Salmonella_genome_FQ312003.1_SL1344.fasta'
+#     expectedMap = f'{TESTDATA}/mapping/library_13_1_barcode_ed.txt'
+#     outMap = f'{TESTDATA}/mapping/tmp/library_13_1_barcode.txt'
+#     return r1, r2, genome, expectedMap, outMap
+#
+# def get_test_data_map():
     fasta_file = f'{TESTDATA}/mapping/tnseq_host_reads.fasta'
     blastn_file = f'{TESTDATA}/mapping/tnseq_host_reads.blastn'
     Sdb = f'{TESTDATA}/ref/Salmonella_genome_FQ312003.1_SL1344.fasta'
@@ -51,13 +70,14 @@ def test_map_host_map():
     #out, err, proc = capture(cmd_str2)
     #assert proc.returncode == 0
 
-test_map_host_map()
+#test_map_host_map()
 
 
 def test_map_host_new():
     fasta_file, blastn_file, Sdb = get_test_data_map()
     barcode_file = f'{TESTDATA}/new_map.csv'
     map_host_new(fasta_file, blastn_file, Sdb, 1, barcode_file)
+
 
 
 
