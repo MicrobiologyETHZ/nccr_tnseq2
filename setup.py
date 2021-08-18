@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 requires = [
     'click',
@@ -16,7 +16,7 @@ setup(
     keywords="tnseq",
     install_requires=requires,
     #url = "https://github.com/SushiLab/TNSEQ_DEV",
-    packages=['tnseq2'],
+    packages=find_packages(),
     entry_points={
         'console_scripts': ['tnseq2=tnseq2.main:main'],
     }
