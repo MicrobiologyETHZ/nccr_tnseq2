@@ -76,7 +76,8 @@ def extract_barcodes(inserts: Generator[Tuple[FastA, FastA], None, None],
 def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: str,
                              tp2: str='GTGTATAAGAGACAG', bc2tp2:int=13, bcLen:int=17, before:bool=True,
                              min_host_bases: int = 20, logger: Logger = logging.getLogger()) -> None:
-    '''
+
+    """
     Wrapper function to extract barcodes and host sequences from
     sequence file. Sequences will then be written to fasta file
     for downstream analysis
@@ -84,7 +85,8 @@ def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: 
     :param in_r2_file:
     :param temp_fasta_file:
     :return:
-    '''
+    """
+
     fq1_stream: Generator[FastA, None, None] = stream_fa(in_r1_file)
     fq2_stream: Generator[FastA, None, None] = stream_fa(in_r2_file)
     logger.info('----------------')
@@ -108,38 +110,44 @@ def prepare_extract_barcodes(in_r1_file: str, in_r2_file: str, temp_fasta_file: 
 
 
 def map_host_map(temp_fasta_file: str, temp_blastn_file: str, genome: str = '',
-                 blastdb: str = '', blast_threads: int = 1, logger: Logger = logging.getLogger()) -> None:
+                 blastdb: str = '', blast_threads: int = 1, logger: Logger = logging.getLogger()) -> Tuple[int, int]:
     """
-    Map reads against the  blast database (create database if doesn't already exist)
+    Map reads against the  blast database (creates database from reference genome
+     if doesn't already exist)
     :param temp_fasta_file:
     :param temp_blastn_file:
     :param genome:
     :param blastdb:
-    :param out_barcode_file:
     :param blast_threads:
-    :return:
+    :param logger:
+    :return: None
 
     """
+    db_return_code = 0
     if not blastdb and not genome:
         logging.error("Genome or blast database needs to be provided")
         sys.exit(1)
     elif not blastdb:
         command0 = f'makeblastdb -in {genome} -dbtype nucl'
-        check_call(command0)
         logging.info('No blastdb provided, generating blast db from genome.')
         logging.info(f"Blast command:\t{command0}")
+        db_return_code = check_call(command0)
         blastdb = genome
     command = f'blastn -task blastn -db {blastdb} -out {temp_blastn_file} -query {temp_fasta_file} ' \
               f'-outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore qseq sstrand" ' \
               f'-num_threads {blast_threads}'
     logger.info(f'Blastn command:\t{command}')
-    check_call(command)
+    blast_return_code = check_call(command)
+    return db_return_code, blast_return_code
 
 
-def new_map_annotate(blast_file: str, logger: Logger = logging.getLogger()) -> pd.DataFrame:
+def new_map_annotate(blast_file: str, filter_below: int = 100,  logger: Logger = logging.getLogger()) -> pd.DataFrame:
     """
     Takes in blast file, and provides most likely locations for each barcode
-
+    :param: blast_file
+    :param: filter_below
+    :param: logger
+    :return: pd.DataFrame
     """
     df = pd.read_table(blast_file, header=None)
     df.columns = "qseqid sseqid pident length qstart qend sstart send evalue bitscore qseq sstrand".split()
@@ -152,11 +160,12 @@ def new_map_annotate(blast_file: str, logger: Logger = logging.getLogger()) -> p
     best_hits['barcode'] = best_hits['qseqid'].str.split('_', expand=True)[[2]]
     # Get count out of qseqid
     best_hits['cnt'] = best_hits['qseqid'].str.split('_', expand=True)[[4]].astype(int)
-    # Note: Total counts are calculated with cnt 1 included, but low counts are filtered out right after
+    # Note: Total counts are calculated with cnt 1 included,
+    # but low counts are filtered out right after
     total_count = best_hits.groupby('barcode').cnt.sum().reset_index()
     total_count.columns = ['barcode', 'total_count']
     best_hits = best_hits.merge(total_count, how='left', on='barcode')
-    best_hits = best_hits[best_hits.cnt > 1] #todo should be 100 or optional
+    best_hits = best_hits[best_hits.cnt > filter_below]  # todo should be 100 or optional
     logger.info(f"Number of barcodes: {best_hits.barcode.nunique()}")
     # Create best hits data frame by merging best_hits with other columns from blast file
     # There still could be multiple hits for each qseqid, if they have the same blast score
@@ -193,11 +202,11 @@ def editdistance(seq1: str, seq2: str) -> int:
 
 
 def merge_colliding_bcs(potential_positions: pd.DataFrame, edit_dist=3, logger: Logger = logging.getLogger()) -> pd.DataFrame:
-    '''
+    """
 
     Takes output of new_map_annotate, and merges colliding barcodes
 
-    '''
+    """
     pps = potential_positions[['sseqid', 'sstart', 'send', 'sstrand', 'barcode', 'cnt', 'total_count', 'multimap']]
     # Find barcodes mapped to the same position
     collisions = (potential_positions.groupby(['sseqid', 'sstart']).barcode.nunique()
@@ -229,13 +238,26 @@ def merge_colliding_bcs(potential_positions: pd.DataFrame, edit_dist=3, logger: 
     return barcode_map
 
 
-def add_gff_annotations(barcode_map: pd.DataFrame, bed_file: str, gff_file: str, output_map: str) -> str:
+def add_gff_annotations(barcode_map: pd.DataFrame, bed_file: str, gff_file: str, output_map: str) -> int:
+
+    """
+    Takes output of merge colliding bcs, turns it into bed file, then finds intersections with
+    annotation file.
+    Generates tab file with the following columns: chr | sstart | gff-info-field | barcode
+
+    :param barcode_map:
+    :param bed_file: file path to create tmp bed file needed by bedtools intersect
+    :param gff_file:
+    :param output_map: tab file with the following columns: chr | sstart | gff-info-field | barcode
+    :return: bedtoosl intersect return code
+    """
     bed_map = barcode_map.copy().reset_index()
     bed_map['startOffBy1'] = bed_map['sstart'] - 1
+    # todo make creation of bedfile internal, remove after done
     bed_map[['sseqid', 'startOffBy1', 'startOffBy1', 'barcode']].to_csv(bed_file, sep='\t', index=False, header=False)
     command = f"bedtools intersect -wb -a {gff_file} -b {bed_file} |cut -f1,5,9,13|grep 'ID=gene' > {output_map}"
-    check_call(command)
-    return output_map
+    bed_return_code = check_call(command)
+    return bed_return_code
 
 
 def add_gene_annotations(bedfile_path, barcode_map, barcode_file):
@@ -244,7 +266,6 @@ def add_gene_annotations(bedfile_path, barcode_map, barcode_file):
     '''
     bedfile = pd.read_table(bedfile_path, header=None)
     bedfile.columns = ['seq', 'position', 'gene_info', 'barcode']
-
     bedfile['ShortName'] = bedfile['gene_info'].str.extract(r'(Name=.+?;)', expand=False).str.replace('Name=', '').str.strip(';')
     bedfile['locus_tag'] = bedfile['gene_info'].str.extract(r'(locus_tag=.+?$)', expand=False).str.replace(
         'locus_tag=', '').str.strip(';')
@@ -255,8 +276,23 @@ def add_gene_annotations(bedfile_path, barcode_map, barcode_file):
 
 
 def map_host_new(temp_fasta_file: str, temp_blastn_file: str, genome: str,
-                 blast_threads: int, temp_bed_file: str, output_map: str, barcode_file: str, gff_file: str='',
+                 blast_threads: int, temp_bed_file: str, output_map: str, barcode_file: str, gff_file: str='', filter_below: int=100,
                  logger: Logger = logging.getLogger()) -> None:
+    """
+    Takes fasta file produced by prepare_extract_barcodes, runs blast and annotates
+
+    :param temp_fasta_file: fasta file producted by prepare_extract_barcodes
+    :param temp_blastn_file: file to write blast results to
+    :param genome: path to the refernce genome
+    :param blast_threads:
+    :param temp_bed_file:
+    :param output_map:
+    :param barcode_file:
+    :param gff_file:
+    :param filter_below:
+    :param logger:
+    :return:
+    """
 
     logger.info('----------------')
     logger.info('Step 2.1: Start blastn alignment of dereplicated barcode/host pairs')
@@ -266,7 +302,7 @@ def map_host_new(temp_fasta_file: str, temp_blastn_file: str, genome: str,
     logger.info('----------------')
     logger.info('Step 2.2: Start annotating barcodes')
     # Figure out the positions
-    potential_positions = new_map_annotate(temp_blastn_file, logger)
+    potential_positions = new_map_annotate(temp_blastn_file, filter_below, logger)
     logger.info('Resolving barcode collisions')
     final_positions = merge_colliding_bcs(potential_positions, logger=logger)
     final_positions.to_csv(barcode_file)
@@ -279,8 +315,8 @@ def map_host_new(temp_fasta_file: str, temp_blastn_file: str, genome: str,
     return None
 
 
-def map(r1_file, r2_file, name, output_dir, transposon, genome, gff_file,  min_host_bases=20, blast_threads=1):
-    logger = get_logger('Quantify_Logger', Path(output_dir) / 'tnseq2_mapping.log')
+def map(r1_file, r2_file, name, output_dir, transposon, genome, gff_file,  min_host_bases=20, blast_threads=1, filter_below=100):
+    logger = get_logger('Mapping_Logger', Path(output_dir) / 'tnseq2_mapping.log')
     logger.info(f'Transposon: {transposon}')
     logger.info(f"FASTQ file: {r1_file}")
     logger.info(f"GFF file: {gff_file}")
@@ -297,7 +333,10 @@ def map(r1_file, r2_file, name, output_dir, transposon, genome, gff_file,  min_h
     logger.info("Starting Barcode Mapping")
     logger.info('Extracting Barcodes')
     prepare_extract_barcodes(r1_file,  r2_file, fasta_file,  tp2, bc2tp2, bcLen, before, min_host_bases, logger)
-    map_host_new(fasta_file, blastn_file, genome, blast_threads, bed_file, output_map,  barcode_file, gff_file, logger)
+    map_host_new(fasta_file, blastn_file, genome, blast_threads, bed_file, output_map,  barcode_file, gff_file, filter_below, logger)
+
+
+
 
 
 if __name__ == '__main__':

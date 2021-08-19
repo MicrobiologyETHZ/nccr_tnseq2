@@ -50,14 +50,16 @@ def demux(config, input_file, demux_file, out_dir, rc, transposon, dry, local, n
 @click.option('--genome', '-g',  help='Reference genome (FASTA)')
 @click.option('--name', '-n', help='Unique library name')
 @click.option('--out_dir', '-o', default='.', help='Output directory')
+@click.option('--filter_low_counts', '-l', default=100, help='Filter out barcodes supported by [int] or less reads. Default: [100]')
 @click.option('--blast_threads', '-t', default=1, help='Blast Threads')
 @click.option('--transposon', '-tn', default="GTGTATAAGAGACAG:17:13:before", help='Construct Structure:\n\n'
                                                                                 'TN sequence:BC length:length of spacer between BC and TN sequence:BC position relative to TN \n\n'
                                                                                   'Default: GTGTATAAGAGACAG:17:13:before')
-def maplib(forward, reverse, gff, name, transposon, out_dir, genome, blast_threads):
+def maplib(forward, reverse, gff, name, transposon, out_dir, genome, blast_threads, filter_low_counts):
     if not name:
         name = Path(forward.strip('.gz')).stem
-    map(forward, reverse, name, out_dir, transposon, genome, gff_file=gff, blast_threads=blast_threads)
+    map(forward, reverse, name, out_dir, transposon, genome, gff_file=gff,
+        blast_threads=blast_threads, filter_below=filter_low_counts)
 
 
 # COUNT

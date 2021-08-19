@@ -1,7 +1,7 @@
 import subprocess
 
 
-def check_call(command: object) -> object:
+def check_call(command: object) -> int:
     """
     Simple wrapper to execute check_call and catch exceptions
     :param command:

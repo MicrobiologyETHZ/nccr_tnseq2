@@ -1,6 +1,7 @@
-from tnseq2.src.sequence import stream_fa, FastA
+from tnseq2.src.sequence import FastA
 
 from typing import Tuple, List
+
 
 def extract_barcode_host(r1: FastA, tp2: str, bc2tp2:int=13, bcLen:int=17, before:bool=True) -> Tuple[str, str]:
     '''
