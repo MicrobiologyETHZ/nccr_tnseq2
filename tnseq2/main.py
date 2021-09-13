@@ -14,7 +14,7 @@ def main():
 
 
 #DEMUX
-@main.command(help='demultiplexing RBSeq fastq files')
+@main.command(help='demultiplex RBSeq fastq files')
 @click.option('--config', '-c', help='Configuration File')
 @click.option('--input_file', '-i',  help='Input FASTQ to demultiplex')
 @click.option('--demux_file', '-d', help='Barcode Map, tab delimited, ex.\n\nACCT\tSample1\n\nAAGG\tSample2\n')
@@ -30,9 +30,9 @@ def demux(config, input_file, demux_file, out_dir, rc, transposon, dry, local, n
     if (config or input_file) and not (config and input_file):
         if config:
             print(f'Your provided a config file: {config}')
-            click.echo("Running {}".format('locally' if local else ('dry' if dry else 'on cluster')))
-            cmd = snakemake_cmd(config, 'demux_all', dry, local)
-            click.echo(" ".join(cmd))
+            #click.echo("Running {}".format('locally' if local else ('dry' if dry else 'on cluster')))
+            #cmd = snakemake_cmd(config, 'demux_all', dry, local)
+            #click.echo(" ".join(cmd))
         else:
             print(f"You've provided a FASTQ file: {input_file}")
             demux_tnseq(input_file, demux_file, out_dir, name, transposon, rc)
@@ -42,7 +42,7 @@ def demux(config, input_file, demux_file, out_dir, rc, transposon, dry, local, n
 
 
 # MAPPING
-@main.command()
+@main.command(short_help="map barcodes to reference genome")
 @click.option('--forward', '-f',  help='Forward Reads')
 @click.option('--reverse', '-r',  help='Reverse Reads')
 @click.option('--gff', '-a', default='', help='Annotation File in gff format. '
@@ -63,7 +63,7 @@ def maplib(forward, reverse, gff, name, transposon, out_dir, genome, blast_threa
 
 
 # COUNT
-@main.command(help="Counting Barcodes in Samples")
+@main.command(short_help="count barcodes in one sample")
 @click.option('--forward', '-f',  help='Input FASTQ to count. (Forward Reads only)')
 @click.option('--mapping_file', '-m', help='Barcode Map in csv format. First column must be titled "barcode", and contain the barcodes. \n\n'
                                            'Example: \n\n'
@@ -102,7 +102,7 @@ def count(forward, mapping_file, out_dir, transposon, sample_name):
 
 
 #MERGE
-@main.command("Merge count results from multiple samples. Under construction.")
+@main.command( short_help ="merge counts from multiple samples. Under construction.")
 @click.option('--count_dir', '-d',  help='Input directory with count files')
 @click.option('--meta_file', '-m', default='', help='Meta file, format: ...')
 @click.option('--control_file', '-b', default='', help="File with WITS info, format: ...")
@@ -114,7 +114,7 @@ def merge(config, count_dir, meta_file, control_file, runid):
 
 
 
-@main.command("Analyze transposons for differential abundance. Under construction")
+@main.command(short_help="analyze transposons for differential abundance. Under construction")
 @click.option('--config', '-c', default='configs/analyze_config.yaml', help='Configuration File')
 def analyze():
     pass
