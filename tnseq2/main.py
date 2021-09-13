@@ -84,78 +84,40 @@ def count(forward, mapping_file, out_dir, transposon, sample_name):
 
 
 
-# Custom
-@main.command()
-@click.option('--config', '-c', default='configs/map_config.yaml', help='Configuration File')
-@click.option('--local',  is_flag=True, help="Run on local machine")
-@click.option('--dry',  is_flag=True, help="Show commands without running them")
-@click.option('--method', '-m',  help='Run custom command, for testing mode')
-def custom(config, local, dry, method):
-    click.echo("Mapping Barcode Libraries")
-    click.echo(f"Config file: {config}")
-    click.echo("Samples found: ")
-    click.echo("Running {}".format('locally' if local else 'on cluster'))
-    cmd = snakemake_cmd(config, method, dry, local)
-    click.echo(" ".join(cmd))
-
-
+# # Custom
+# @main.command()
+# @click.option('--config', '-c', default='configs/map_config.yaml', help='Configuration File')
+# @click.option('--local',  is_flag=True, help="Run on local machine")
+# @click.option('--dry',  is_flag=True, help="Show commands without running them")
+# @click.option('--method', '-m',  help='Run custom command, for testing mode')
+# def custom(config, local, dry, method):
+#     click.echo("Mapping Barcode Libraries")
+#     click.echo(f"Config file: {config}")
+#     click.echo("Samples found: ")
+#     click.echo("Running {}".format('locally' if local else 'on cluster'))
+#     cmd = snakemake_cmd(config, method, dry, local)
+#     click.echo(" ".join(cmd))
+#
+#
 
 
 #MERGE
-@main.command()
-@click.option('--config', '-c', help='Configuration File')
+@main.command("Merge count results from multiple samples. Under construction.")
 @click.option('--count_dir', '-d',  help='Input directory with count files')
 @click.option('--meta_file', '-m', default='', help='Meta file, format: ...')
 @click.option('--control_file', '-b', default='', help="File with WITS info, format: ...")
 #@click.option('--out_file', '-o', default='', help='Output Directory')
 @click.option('--runid', '-n', default='', help='Run/Experiment Name')
-@click.option('--local',  is_flag=True, help="Run on local machine")
-@click.option('--dry',  is_flag=True, help="Show commands without running them")
-def merge(config, count_dir, meta_file, control_file, runid, local, dry ):
-    if (config or count_dir) and not (config and count_dir):
-        if config:
-            logging.info(f'Your provided a config file: {config}')
-            click.echo("Running {}".format('locally' if local else ('dry' if dry else 'on cluster')))
-            cmd = snakemake_cmd(config, 'merge', dry, local) #todo write this
-            click.echo(" ".join(cmd))
-        else:
-            logging.info(f"You've provided a counts directory: {count_dir}")
-            final_merge(count_dir,  meta_file, control_file, runid)
-    else:
-        print('Provide either config or FASTQ file (but not both)')
-        sys.exit(1)
+def merge(config, count_dir, meta_file, control_file, runid):
+    logging.info(f"You've provided a counts directory: {count_dir}")
+    final_merge(count_dir,  meta_file, control_file, runid)
 
 
 
-@main.command()
+@main.command("Analyze transposons for differential abundance. Under construction")
 @click.option('--config', '-c', default='configs/analyze_config.yaml', help='Configuration File')
 def analyze():
     pass
-
-
-@main.command()
-@click.option('--config', '-c', default='configs/count_config.yaml', help='Configuration File')
-def unlock(config):
-    cmd = shlex.split(f'snakemake --configfile {config} -j 1 --unlock ')
-    wdPath = Path(__file__).parent.absolute()
-    subprocess.check_call(cmd, cwd=wdPath)
-
-
-def snakemake_cmd(config, analysis, dry, local):
-    if dry:
-        cmd = shlex.split(f'snakemake --configfile {config} -np {analysis} ')
-    elif local:
-        cmd = shlex.split(f'snakemake --configfile {config} --use-conda -j 1 {analysis} ')
-    else:
-        rstring = r'"DIR=$(dirname {params.qoutfile}); mkdir -p \"${{DIR}}\"; qsub -S /bin/bash -V -cwd -o {params.qoutfile} -e {params.qerrfile} -pe smp {threads} -l h_vmem={params.mem}M"'
-        part1 = shlex.split(f'snakemake --configfile {config} --use-conda -k --cluster ')
-        part2 = shlex.split(f'{rstring}')
-        part3 = shlex.split(f' -p -j 6 --max-jobs-per-second 1 {analysis}')
-        cmd = part1 + part2 + part3
-    wdPath = Path(__file__).parent.absolute()
-    subprocess.check_call(cmd, cwd=wdPath)
-    return cmd
-
 
 if __name__ == "__main__":
     main()

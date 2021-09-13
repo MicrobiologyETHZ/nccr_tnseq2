@@ -5,6 +5,10 @@ channels:
   - conda-forge
 dependencies:
   - python==3.8.*
-  #- snakemake==6.6.*
   - blast==2.9.*
   - bedtools==2.30.*
+  - pytest
+  - click
+  - pip
+  - pip:
+      - git+https://github.com/MicrobiologyETHZ/nccr_tnseq2#egg=tnseq2

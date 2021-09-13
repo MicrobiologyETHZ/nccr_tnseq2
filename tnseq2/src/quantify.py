@@ -23,15 +23,16 @@ def quantify_load_fq_barcodes(in_fq_file: str, tp2: str = 'GTGTATAAGAGACAG',
     -----|-17bp--|---13bp---|---------15bp--------|----?--------
     ---(-30)---(-13)-------(0)---------------------------------
 
+    Uses extract_barcode_host to actually get the barcode sequence
 
-    :param in_fq_file:
+    :param in_fq_file: path to forward reads file (FASTQ/FASTA)
     :param tp2: conserved tn sequence
     :param bc2tp2: distance between barcode and conserved sequence
     :param bcLen: length of the barcode
     :param before: if the barcode before or after the conserved sequence
     :param logger:
 
-    :return:
+    :return: counter[barcode]=count
     '''
     fq1_stream = stream_fa(in_fq_file)
     logger.info("Counting reads with and without transposon sequence")
@@ -75,14 +76,21 @@ def editdistance(seq1: str, seq2: str) -> int:
     if len(seq1) != len(seq2):
         raise Exception(
             f'{seq1} and {seq2} have different length. Edit distance can be computed on same length sequences only.')
-    dist = 0
-    for letter1, letter2 in zip(seq1, seq2):
-        if letter1 != letter2:
-            dist += 1
-    return dist
+
+    return sum(letter1 != letter2 for letter1, letter2 in zip(seq1, seq2))
 
 
-def get_similar(bc_to_id, bc_mapped, logger):
+
+def get_similar(bc_to_id: list, bc_mapped: list, logger: Logger):
+    """
+
+    Take list of unannotated barcodes (bc_to_id) and list mapped barcodes.
+    Calculate edit distance between each unannotated barcode and each mapped barcode
+    For each unannotated barcode get a mapped barcode with smallest edit distance
+
+    How to make this faster?
+
+    """
     # slow slow slow
     distances = {}
     logger.info(f'Calculating edit distances between annotated and unannotated barcodes')
