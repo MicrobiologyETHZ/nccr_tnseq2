@@ -92,6 +92,7 @@ def get_similar(bc_to_id: list, bc_mapped: list, logger: Logger):
 
     """
     # slow slow slow
+    assert len(bc_to_id) > 0
     distances = {}
     logger.info(f'Calculating edit distances between annotated and unannotated barcodes')
     for total, bc in enumerate(bc_to_id):
@@ -107,9 +108,8 @@ def get_similar(bc_to_id: list, bc_mapped: list, logger: Logger):
         distances[bc] = [min_dist, match]
 
     dist = pd.DataFrame(distances).T.reset_index()
-    #print(dist.head())
-    dist.columns = ['barcode', 'editdistance', 'match']
 
+    dist.columns = ['barcode', 'editdistance', 'match']
     return dist
 
 
@@ -130,26 +130,34 @@ def annotate_barcodes(cnter, barcode_map_file, logger, edit_cutoff=3):
     # This needs to be done in the mapping step. Here want to be flexible for mapping file input.
     #bc_df.columns = 'barcode,libcnt,sstart,send,sseqid,sstrand,multimap,ShortName,locus_tag'.split(',')
     to_keep = bc_df.columns
-    logger.info(f'Columns fount in the mapping file: {", ".join(bc_df.columns)}')
+    logger.info(f'Mapping file used: {barcode_map_file}')
+    logger.info(f'Columns found in the mapping file: {", ".join(bc_df.columns)}')
     filter_col = to_keep[1]
     if 'barcode' not in bc_df.columns:
         logger.error('No column "barcode" found')
         sys.exit(1)
-    annotated_cnts = cnts_df.merge(bc_df, how='left', on='barcode')
-    with_ids = annotated_cnts[annotated_cnts[filter_col].notnull()]
+
+    annotated_cnts = cnts_df.merge(bc_df, how='outer', on='barcode')
+    with_ids = annotated_cnts[(annotated_cnts[filter_col].notnull()) & (annotated_cnts.barcode_cnt.notnull())]
     logger.info(f'Number of annotated barcodes: {with_ids.shape[0]}')
     no_ids = annotated_cnts[annotated_cnts[filter_col].isna()]
     logger.info(f'Number of unannotated barcodes:{no_ids.shape[0]}')
-    logger.info(f"Merging  barcodes with edit distance < {edit_cutoff}")
-    distances = get_similar(no_ids.barcode.values, bc_df.barcode.values, logger)
-    no_matches = distances[distances.editdistance >= edit_cutoff]
-    with_matches = distances[distances.editdistance < edit_cutoff]
-    with_matches = (with_matches.merge(cnts_df, how='left', on='barcode')
-                    .drop(['barcode', 'editdistance'], axis=1)
-                    .rename({'match': 'barcode'}, axis=1))
-    never_ided = no_ids[no_ids.barcode.isin(no_matches.barcode.values)]
-    logger.info(f'Number of barcodes w/o annotation: {never_ided.shape[0]}')
-    all_ids = pd.concat([with_ids[['barcode', 'barcode_cnt']].drop_duplicates(), with_matches])
+    if no_ids.shape[0] > 0:
+        logger.info(f"Merging  barcodes with edit distance < {edit_cutoff}")
+        distances = get_similar(no_ids.barcode.values, bc_df.barcode.values, logger)
+        no_matches = distances[distances.editdistance >= edit_cutoff]
+        with_matches = distances[distances.editdistance < edit_cutoff]
+        with_matches = (with_matches.merge(cnts_df, how='left', on='barcode')
+                        .drop(['barcode', 'editdistance'], axis=1)
+                        .rename({'match': 'barcode'}, axis=1))
+        never_ided = no_ids[no_ids.barcode.isin(no_matches.barcode.values)]
+        logger.info(f'Number of barcodes w/o annotation: {never_ided.shape[0]}')
+        all_ids = pd.concat([with_ids[['barcode', 'barcode_cnt']].drop_duplicates(), with_matches])
+
+    else:
+        logger.info(f'All barcodes annotated')
+        all_ids = with_ids[['barcode', 'barcode_cnt']].drop_duplicates()
+        never_ided = pd.DataFrame()
     all_ids = all_ids.groupby('barcode').barcode_cnt.sum().reset_index()
     final_ids = all_ids.merge(annotated_cnts[to_keep], on='barcode', how='left')
     if 'ShortName' in final_ids.columns:
